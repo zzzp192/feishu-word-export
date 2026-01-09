@@ -15,7 +15,6 @@ const TARGET_FIELDS = [
   "附件"
 ];
 
-// 使用原生 DOMContentLoaded 事件替代 $(function() {})
 document.addEventListener('DOMContentLoaded', async function () {
   
   const exportBtn = document.getElementById('exportBtn');
@@ -23,14 +22,29 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   if (!exportBtn || !statusDiv) return;
 
-  // 辅助函数：更新状态文字
   const setStatus = (msg: string) => {
     statusDiv.innerText = msg;
   };
 
+  // 【核心修复】定义一个通用的阻止冒泡函数
+  const stopEventPropagation = (e: Event) => {
+    if (e) {
+      e.stopPropagation();
+      // 在某些极端情况下，可能还需要阻止立即传播
+      e.stopImmediatePropagation();
+    }
+  };
+
+  // 【核心修复】同时监听 mousedown 和 mouseup，防止报错堆栈中的 _handleMouseUp 触发
+  exportBtn.addEventListener('mousedown', stopEventPropagation);
+  exportBtn.addEventListener('mouseup', stopEventPropagation);
+  
+  // 主逻辑
   exportBtn.addEventListener('click', async function (e) {
-    // 【关键修复】阻止事件冒泡，防止触发飞书宿主环境的 e.closest 报错
-    e.stopPropagation();
+    // 同样阻止 click 的冒泡
+    stopEventPropagation(e);
+    
+    // 阻止默认行为（比如表单提交）
     e.preventDefault();
 
     setStatus('正在获取数据...');
@@ -73,10 +87,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       setStatus('正在读取模板...');
 
       // 3. 读取模板
-      // 注意：这里必须是 './template.docx'，且文件必须在 public 目录下
       const response = await fetch('./template.docx');
       if (!response.ok) {
-        throw new Error(`无法加载模板 (Status: ${response.status})。请确认 template.docx 在 public 文件夹下，且 index.html 在根目录。`);
+        throw new Error(`无法加载模板 (Status: ${response.status})`);
       }
       const content = await response.arrayBuffer();
 
@@ -108,7 +121,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 });
 
-// 辅助函数保持不变
 async function formatFieldValue(field: IField, val: any): Promise<string> {
   if (val === null || val === undefined) return "";
 
@@ -116,7 +128,6 @@ async function formatFieldValue(field: IField, val: any): Promise<string> {
 
   if (type === FieldType.DateTime) {
      const date = new Date(val);
-     // 简单的日期格式化
      return date.toLocaleDateString() + " " + date.toLocaleTimeString(); 
   }
 
