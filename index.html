@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Word 导出插件</title>
+  </head>
+  <body>
+    <div id="app" style="padding: 20px;">
+      <h3>任务委托单导出</h3>
+      <p>请在表格中选中一行，然后点击下方按钮。</p>
+      <button id="exportBtn" style="padding: 10px 20px; background-color: #3370ff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+        导出选中行到 Word
+      </button>
+      <div id="status" style="margin-top: 10px; color: gray;"></div>
+    </div>
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>
