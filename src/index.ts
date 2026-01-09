@@ -4,7 +4,21 @@ import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import './index.scss';
 
-// 定义需要导出的字段名
+// 1. 注入 CSS 补丁，强制屏蔽按钮内部文字的鼠标事件，解决 e.closest 报错
+const style = document.createElement('style');
+style.innerHTML = `
+  /* 关键：让按钮内的所有子元素（如文字）不响应鼠标，点击事件直接由按钮捕获 */
+  #exportBtn * {
+    pointer-events: none;
+  }
+  /* 增加一些点击反馈 */
+  #exportBtn:active {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+`;
+document.head.appendChild(style);
+
 const TARGET_FIELDS = [
   "任务名称",
   "委托单号",
@@ -26,31 +40,35 @@ document.addEventListener('DOMContentLoaded', async function () {
     statusDiv.innerText = msg;
   };
 
-  // 【核心修复】定义一个通用的阻止冒泡函数
+  // 辅助：阻止事件冒泡的通用函数
   const stopEventPropagation = (e: Event) => {
     if (e) {
       e.stopPropagation();
-      // 在某些极端情况下，可能还需要阻止立即传播
       e.stopImmediatePropagation();
     }
   };
 
-  // 【核心修复】同时监听 mousedown 和 mouseup，防止报错堆栈中的 _handleMouseUp 触发
-  exportBtn.addEventListener('mousedown', stopEventPropagation);
-  exportBtn.addEventListener('mouseup', stopEventPropagation);
-  
-  // 主逻辑
-  exportBtn.addEventListener('click', async function (e) {
-    // 同样阻止 click 的冒泡
+  // 2. 绑定事件：同时拦截 mousedown, mouseup, click
+  // 即使 CSS 修复了 target 问题，阻止冒泡依然是双重保险
+  ['mousedown', 'mouseup', 'click'].forEach(eventType => {
+    exportBtn.addEventListener(eventType, (e) => {
+      // 如果是 click 事件，执行业务逻辑，否则只阻止冒泡
+      if (eventType === 'click') {
+        handleExport(e);
+      } else {
+        stopEventPropagation(e);
+      }
+    });
+  });
+
+  // 3. 核心导出逻辑
+  async function handleExport(e: Event) {
     stopEventPropagation(e);
-    
-    // 阻止默认行为（比如表单提交）
     e.preventDefault();
 
     setStatus('正在获取数据...');
 
     try {
-      // 1. 获取选区
       const selection = await bitable.base.getSelection();
       const tableId = selection.tableId;
       const recordId = selection.recordId;
@@ -68,7 +86,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         fieldMap.set(meta.name, meta.id);
       });
 
-      // 2. 提取数据
       const templateData: any = {};
       
       for (const fieldName of TARGET_FIELDS) {
@@ -86,16 +103,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       setStatus('正在读取模板...');
 
-      // 3. 读取模板
+      // 4. 读取模板文件
       const response = await fetch('./template.docx');
       if (!response.ok) {
-        throw new Error(`无法加载模板 (Status: ${response.status})`);
+        throw new Error(`无法加载模板 (Status: ${response.status})。请检查 template.docx 是否在 public 目录下。`);
       }
       const content = await response.arrayBuffer();
 
       setStatus('正在生成 Word...');
 
-      // 4. 生成文档
       const zip = new PizZip(content);
       const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
@@ -118,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       console.error(error);
       setStatus(`导出失败：${error.message}`);
     }
-  });
+  }
 });
 
 async function formatFieldValue(field: IField, val: any): Promise<string> {
