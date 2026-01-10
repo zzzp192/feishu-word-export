@@ -1,16 +1,60 @@
-Run npm install
-4
-npm error code EJSONPARSE
-5
-npm error path /home/runner/work/feishu-word-export/feishu-word-export/package.json
-6
-npm error JSON.parse Unexpected string in JSON at position 756 while parsing near "...s\": \"^1.0.12\"\n  }\n}\n\"dependencies\": {\n  ..."
-7
-npm error JSON.parse Failed to parse JSON data.
-8
-npm error JSON.parse Note: package.json must be actual JSON, not just JavaScript.
-9
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-01-10T06_44_51_058Z-debug-0.log
-10
-Error: 
-Process completed with exit code 1.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      
+      # 【核心修改】进入子文件夹，生成 package.json 并打包
+      - name: Generate package.json, Install and Build
+        run: |
+          # 1. 进入你的项目文件夹 (注意：如果是其他名字，请修改下面的 feishu-word-export)
+          cd feishu-word-export
+          
+          # 2. 自动生成 package.json (解决手写错误)
+          echo '{ "name": "lark-plugin", "type": "module" }' > package.json
+          
+          # 3. 安装依赖
+          npm install vite typescript sass @types/jquery @types/file-saver --save-dev
+          npm install @lark-base-open/js-sdk docxtemplater pizzip file-saver jquery reset-css --save
+
+          # 4. 打包
+          npx vite build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 上传打包结果 (路径也需要对应修改)
+          path: ./feishu-word-export/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
