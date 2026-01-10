@@ -26,27 +26,47 @@ jobs:
         with:
           node-version: "18"
       
-      # 【核心修改】进入子文件夹，生成 package.json 并打包
-      - name: Generate package.json, Install and Build
+      # 【核心修复步骤】
+      # 无论仓库里的 package.json 有多烂，这里直接强制覆盖生成一个新的。
+      # 这一步必须在 npm install 之前运行！
+      - name: Force Fix package.json
         run: |
-          # 1. 进入你的项目文件夹 (注意：如果是其他名字，请修改下面的 feishu-word-export)
-          cd feishu-word-export
-          
-          # 2. 自动生成 package.json (解决手写错误)
-          echo '{ "name": "lark-plugin", "type": "module" }' > package.json
-          
-          # 3. 安装依赖
-          npm install vite typescript sass @types/jquery @types/file-saver --save-dev
-          npm install @lark-base-open/js-sdk docxtemplater pizzip file-saver jquery reset-css --save
+          echo '{
+            "name": "lark-plugin",
+            "version": "1.0.0",
+            "type": "module",
+            "scripts": {
+              "build": "vite build"
+            },
+            "devDependencies": {
+              "@types/jquery": "^3.5.16",
+              "@types/file-saver": "^2.0.7",
+              "sass": "^1.63.6",
+              "typescript": "^4.7.4",
+              "vite": "^3.0.4"
+            },
+            "dependencies": {
+              "@lark-base-open/js-sdk": "^0.5.0",
+              "bootstrap": "^5.3.0",
+              "docxtemplater": "^3.46.0",
+              "pizzip": "^3.1.6",
+              "file-saver": "^2.0.5",
+              "jquery": "^3.7.1",
+              "reset-css": "^5.0.1"
+            }
+          }' > package.json
 
-          # 4. 打包
-          npx vite build
+      # 现在文件已经修复了，再运行安装命令就不会报错了
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # 上传打包结果 (路径也需要对应修改)
-          path: ./feishu-word-export/dist
+          path: ./dist
 
   deploy:
     environment:
